@@ -5,9 +5,10 @@ const os = require("node:os");
 const path = require("node:path");
 const { Worker } = require("node:worker_threads");
 
-const HOST = process.env.HOST || "127.0.0.1";
+const HOST = "0.0.0.0";
 const PORT = Number(process.env.PORT || 3000);
 const ROOT_DIR = __dirname;
+
 const STATIC_FILES = new Map([
   ["/", "index.html"],
   ["/index.html", "index.html"],
@@ -23,6 +24,14 @@ let currentDocuments = [];
 const eventClients = new Set();
 
 const server = http.createServer(async (request, response) => {
+  setCorsHeaders(response);
+
+  if (request.method === "OPTIONS") {
+    response.writeHead(204);
+    response.end();
+    return;
+  }
+
   try {
     const requestUrl = new URL(request.url, `http://${request.headers.host || `${HOST}:${PORT}`}`);
 
@@ -78,13 +87,17 @@ const server = http.createServer(async (request, response) => {
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`Document Keyword Search web app running at http://${HOST}:${PORT}`);
+  console.log(`Document Keyword Search web app running on port ${PORT}`);
 });
 
+function setCorsHeaders(response) {
+  response.setHeader("Access-Control-Allow-Origin", "*");
+  response.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  response.setHeader("Access-Control-Allow-Headers", "Content-Type");
+}
+
 function getBackendWorker() {
-  if (backendWorker) {
-    return backendWorker;
-  }
+  if (backendWorker) return backendWorker;
 
   backendWorker = new Worker(path.join(ROOT_DIR, "search-backend-worker.js"), {
     workerData: {
@@ -133,9 +146,7 @@ async function handleFolderList(requestUrl, response) {
   const folders = [];
 
   for (const entry of entries) {
-    if (!entry.isDirectory()) {
-      continue;
-    }
+    if (!entry.isDirectory()) continue;
 
     folders.push({
       name: entry.name,
@@ -143,7 +154,9 @@ async function handleFolderList(requestUrl, response) {
     });
   }
 
-  folders.sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: "base" }));
+  folders.sort((left, right) =>
+    left.name.localeCompare(right.name, undefined, { sensitivity: "base" })
+  );
 
   sendJson(response, {
     currentPath: folderPath,
@@ -238,7 +251,8 @@ function openEventStream(request, response) {
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache, no-transform",
     "Connection": "keep-alive",
-    "X-Accel-Buffering": "no"
+    "X-Accel-Buffering": "no",
+    "Access-Control-Allow-Origin": "*"
   });
 
   response.write("retry: 1000\n\n");
@@ -294,9 +308,7 @@ async function readJsonBody(request) {
     chunks.push(chunk);
   }
 
-  if (chunks.length === 0) {
-    return {};
-  }
+  if (chunks.length === 0) return {};
 
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
 }
@@ -334,13 +346,8 @@ async function getFolderRoots() {
   const homePath = os.homedir();
   const cwdPath = process.cwd();
 
-  if (homePath) {
-    roots.push({ name: "Home", path: homePath });
-  }
-
-  if (cwdPath && cwdPath !== homePath) {
-    roots.push({ name: "App folder", path: cwdPath });
-  }
+  if (homePath) roots.push({ name: "Home", path: homePath });
+  if (cwdPath && cwdPath !== homePath) roots.push({ name: "App folder", path: cwdPath });
 
   return roots;
 }
@@ -377,7 +384,9 @@ function getContentType(filePath) {
 function sendJson(response, payload, statusCode = 200) {
   response.writeHead(statusCode, {
     "Content-Type": "application/json; charset=utf-8",
-    "Cache-Control": "no-store"
+    "Cache-Control": "no-store",
+    "Access-Control-Allow-Origin": "*"
   });
+
   response.end(JSON.stringify(payload));
 }
