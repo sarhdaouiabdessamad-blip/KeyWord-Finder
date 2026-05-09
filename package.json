@@ -1,0 +1,14 @@
+{
+  "name": "document-keyword-search-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Fast local web API document keyword search",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "jszip": "^3.10.1",
+    "pdf-parse": "^1.1.1"
+  }
+}
